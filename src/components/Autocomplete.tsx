@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
 import { Person } from '../types/Person';
+import { useState, useEffect, useMemo, useRef } from 'react';
 
 type Props = {
   peoples: Person[];
