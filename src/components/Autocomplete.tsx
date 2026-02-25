@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Person } from '../types/Person';
 
 type Props = {
@@ -14,16 +13,10 @@ export const Autocomplete: React.FC<Props> = ({
   delay = 300,
 }) => {
   const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState(query);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setQuery(event.target.value);
-    onSelected?.(null);
-  };
 
-  const filteredPerson = peoples.filter(people =>
-    people.name.toLowerCase().includes(debouncedQuery.toLowerCase()),
-  );
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -35,10 +28,43 @@ export const Autocomplete: React.FC<Props> = ({
     };
   }, [query, delay]);
 
+  const trimmedQuery = debouncedQuery.trim();
+
+  const filteredPerson = useMemo(() => {
+    if (trimmedQuery === '') {
+      return peoples;
+    }
+
+    return peoples.filter(person =>
+      person.name.toLowerCase().includes(trimmedQuery.toLowerCase()),
+    );
+  }, [trimmedQuery, peoples]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setQuery(event.target.value);
+    onSelected?.(null);
+    setIsOpen(true);
+  };
+
   return (
-    <div
-      className={`dropdown ${isOpen && debouncedQuery !== null ? 'is-active' : ' '}`}
-    >
+    <div ref={containerRef} className={`dropdown ${isOpen ? 'is-active' : ''}`}>
       <div className="dropdown-trigger">
         <input
           type="text"
@@ -51,25 +77,28 @@ export const Autocomplete: React.FC<Props> = ({
         />
       </div>
 
-      <div className="dropdown-menu" role="menu" data-cy="suggestions-list">
-        <div className="dropdown-content">
-          {filteredPerson.map(person => (
-            <div
-              key={person.name}
-              className="dropdown-item"
-              data-cy="suggestion-item"
-              onClick={() => {
-                onSelected?.(person);
-                setQuery(person.name);
-                setIsOpen(false);
-              }}
-            >
-              <p className="has-text-link">{person.name}</p>
-            </div>
-          ))}
+      {isOpen && (
+        <div className="dropdown-menu" role="menu" data-cy="suggestions-list">
+          <div className="dropdown-content">
+            {filteredPerson.map(person => (
+              <div
+                key={person.name}
+                className="dropdown-item"
+                data-cy="suggestion-item"
+                onClick={() => {
+                  onSelected?.(person);
+                  setQuery(person.name);
+                  setIsOpen(false);
+                }}
+              >
+                <p className="has-text-link">{person.name}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-      {query && filteredPerson.length === 0 && (
+      )}
+
+      {trimmedQuery !== '' && filteredPerson.length === 0 && (
         <div
           className="
             notification
